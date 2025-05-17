@@ -18,7 +18,8 @@
   <p id="status"></p>
 
   <script>
-    const scriptURL = 'https://script.google.com/macros/s/AKfycbxdJo96qQ78ubuFNBouTXAH5IQ46bpuj6-1rbgIKELLgPIKAsc2If59NhactRBFOH4u/exec';
+    const appId = 'AKfycbxdJo96qQ78ubuFNBouTXAH5IQ46bpuj6-1rbgIKELLgPIKAsc2If59NhactRBFOH4u';
+    const scriptURL = `https://script.google.com/macros/s/${appId}/exec`;
 
     document.getElementById("contact-form").addEventListener("submit", function(e) {
       e.preventDefault();
@@ -56,7 +57,7 @@
 
   // Dynamically load data as a script (JSONP-style)
   const script = document.createElement('script');
-  script.src = 'https://script.google.com/macros/s/AKfycbxdJo96qQ78ubuFNBouTXAH5IQ46bpuj6-1rbgIKELLgPIKAsc2If59NhactRBFOH4u/exec?callback=callback';
+  script.src = `https://script.google.com/macros/s/${appId}/exec?callback=callback`;
   document.body.appendChild(script);
 </script>
 </body>
