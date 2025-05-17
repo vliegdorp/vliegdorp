@@ -17,35 +17,53 @@
 
   <p id="status"></p>
 
-  <script>
-    const appId = 'AKfycbxdJo96qQ78ubuFNBouTXAH5IQ46bpuj6-1rbgIKELLgPIKAsc2If59NhactRBFOH4u';
-    const scriptURL = `https://script.google.com/macros/s/${appId}/exec`;
+<script>
+  const appId = 'AKfycbxdJo96qQ78ubuFNBouTXAH5IQ46bpuj6-1rbgIKELLgPIKAsc2If59NhactRBFOH4u';
+  const scriptURL = `https://script.google.com/macros/s/${appId}/exec`;
 
-    document.getElementById("contact-form").addEventListener("submit", function(e) {
-      e.preventDefault();
+  document.getElementById("contact-form").addEventListener("submit", function(e) {
+    e.preventDefault();
 
-      const form = e.target;
-      const data = {
-        name: form.name.value,
-        email: form.email.value,
-        message: form.message.value
-      };
+    const userId = getUserId();
+    
+    const form = e.target;
+    const data = {
+      userId: userId,
+      name: form.name.value,
+      email: form.email.value,
+      message: form.message.value
+    };
 
-      fetch(scriptURL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(data)
-      });
-
-      document.getElementById("status").textContent = "Message sent! (Data submitted to Google Sheet)";
-      form.reset();
+    fetch(scriptURL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(data)
     });
-  </script>
 
-  <script>
+    document.getElementById("status").textContent = "Message sent! (Data submitted to Google Sheet)";
+    form.reset();
+  });
+</script>
+
+<script>
+  function generateUUID() {
+    return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
+      (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
+    );
+  }
+
+  function getUserId() {
+    let userId = localStorage.getItem("userId");
+    if (!userId) {
+      userId = generateUUID();
+      localStorage.setItem("userId", userId);
+    }
+    return userId;
+  }
+
   function callback(data) {
     console.log("Spreadsheet data:", data);
     data.forEach(entry => {
