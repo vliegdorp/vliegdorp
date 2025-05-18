@@ -1,82 +1,744 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Google Sheets Contact Form</title>
   <link rel="icon" href="https://www.vliegdorp.nl/wp-content/uploads/vliegdorp/cropped-logo-512-32x32.png" sizes="32x32" />
-</head>
-<body>
-  <h2>Contact Form</h2>
-  <form id="contact-form">
-    <input type="text" name="name" placeholder="Name" required><br><br>
-    <input type="email" name="email" placeholder="Email" required><br><br>
-    <textarea name="message" placeholder="Message"></textarea><br><br>
-    <button type="submit">Send</button>
-  </form>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-4Q6Gf2aSP4eDXB8Miphtr37CMZZQ5oXLH2yaXMJ2w8e2ZtHTl7GptT4jmndRuHDT" crossorigin="anonymous" />
 
-  <p id="status"></p>
-
-<script>
-  const appId = 'AKfycbxdJo96qQ78ubuFNBouTXAH5IQ46bpuj6-1rbgIKELLgPIKAsc2If59NhactRBFOH4u';
-  const scriptURL = `https://script.google.com/macros/s/${appId}/exec`;
-
-  document.getElementById("contact-form").addEventListener("submit", function(e) {
-    e.preventDefault();
-
-    const userId = getUserId();
-    
-    const form = e.target;
-    const data = {
-      userId: userId,
-      name: form.name.value,
-      email: form.email.value,
-      message: form.message.value
-    };
-
-    fetch(scriptURL, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(data)
-    });
-
-    document.getElementById("status").textContent = "Message sent! (Data submitted to Google Sheet)";
-    form.reset();
-  });
-</script>
-
-<script>
-  function generateUUID() {
-    return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
-      (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
-    );
-  }
-
-  function getUserId() {
-    let userId = localStorage.getItem("userId");
-    if (!userId) {
-      userId = generateUUID();
-      localStorage.setItem("userId", userId);
+  <style type="text/css">
+    tfoot.paging {
+      display: none;
     }
-    return userId;
-  }
+    @media (max-width: 768px) {
+      table thead tr th:first-child {width: 40%;}
+      table[data-page='0'] .column-1,
+      table[data-page='0'] .column-2,
+      table[data-page='0'] .column-3 {
+        display: none;
+      }
+      table[data-page='1'] .column-0,
+      table[data-page='1'] .column-2,
+      table[data-page='1'] .column-3 {
+        display: none;
+      }
+      table[data-page='2'] .column-0,
+      table[data-page='2'] .column-1,
+      table[data-page='2'] .column-3 {
+        display: none;
+      }
+      table[data-page='3'] .column-0,
+      table[data-page='3'] .column-1,
+      table[data-page='3'] .column-2 {
+        display: none;
+      }
+      table[data-page] tfoot.paging {
+        display: table-footer-group;
+      }
+    }
+  </style>
+</head>
+<body data-bs-theme="dark">
+  <div class="container" x-data="jsonpFormManager()" x-init="loadData()">
+    <div class="p-2 text-end">
+      <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#exampleModal" x-bind:disabled="loading">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-plus-lg" viewBox="0 0 16 16">
+          <path fill-rule="evenodd" d="M8 2a.5.5 0 0 1 .5.5v5h5a.5.5 0 0 1 0 1h-5v5a.5.5 0 0 1-1 0v-5h-5a.5.5 0 0 1 0-1h5v-5A.5.5 0 0 1 8 2"/>
+        </svg>
+        <span>Wedstrijd toevoegen</span>
+      </button>
+    </div>
+    <div x-show="loading">Loading...</div>
+    <div class="p-2">
+      <template x-for="entry in entries" :key="entry.date">
+        <div>
+          <div class="d-flex">
+            <strong class="flex-grow-1" x-text="entry.opponent"></strong>
+            (<span x-text="entry.homeOrAway"></span>): 
+            <span x-text="entry.date"></span>
+            <button type="button" @click="edit(entry)" class="btn btn-dark" data-bs-toggle="modal" data-bs-target="#exampleModal">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-pencil-fill" viewBox="0 0 16 16">
+                <path d="M12.854.146a.5.5 0 0 0-.707 0L10.5 1.793 14.207 5.5l1.647-1.646a.5.5 0 0 0 0-.708zm.646 6.061L9.793 2.5 3.293 9H3.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.207zm-7.468 7.468A.5.5 0 0 1 6 13.5V13h-.5a.5.5 0 0 1-.5-.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.5-.5V10h-.5a.5.5 0 0 1-.175-.032l-.179.178a.5.5 0 0 0-.11.168l-2 5a.5.5 0 0 0 .65.65l5-2a.5.5 0 0 0 .168-.11z"/>
+              </svg>
+            </button>
+          </div>
+          <hr />
+        </div>
+      </template>
+    </div>
 
-  function callback(data) {
-    console.log("Spreadsheet data:", data);
-    data.forEach(entry => {
-      const div = document.createElement('div');
-      div.textContent = `${entry.name} (${entry.email}): ${entry.message}`;
-      document.body.appendChild(div);
+<form id="contact-form">
+  <div class="modal fade" id="exampleModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-fullscreen">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h1 class="modal-title fs-5" id="exampleModalLabel" x-show="selectedEntry">Wedstrijd aanpassen</h1>
+          <h1 class="modal-title fs-5" id="exampleModalLabel" x-show="!selectedEntry">Wedstrijd toevoegen</h1>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="container">
+            <div class="row mb-3">
+              <div class="col-auto col-md-8">
+                <label for="opponentInput" class="form-label">Tegenstander</label>
+                <div class="d-flex">
+                  <input type="text" name="opponent" required class="form-control flex-grow-1 me-1" id="opponentInput" aria-describedby="opponentHelp" />
+                  <div class="form-check form-switch p-0">
+                    <input type="hidden" name="homeOrAway" value="away" />
+                    <input type="checkbox" name="homeOrAway" value="home" class="btn-check" id="btn-check-2-outlined" checked autocomplete="off" />
+                    <label class="btn btn-outline-success" for="btn-check-2-outlined">Thuis</label>
+                  </div>
+                </div>
+                <div id="opponentHelp" class="form-text">Clubnaam + team. Bv: 't Vliegdorp JO8-3.</div>
+              </div>
+              <div class="col-auto col-md-4 text-md-end">
+                <label for="dateInput" class="form-label">Wedstrijd datum en tijd</label>
+                <input type="datetime-local" name="date" required class="form-control" id="dateInput" aria-describedby="dateHelp" />
+                <div id="dateHelp" class="form-text">Datum met tijd waarop de wedstrijd zal starten.</div>
+              </div>
+            </div>
+            <div>
+              <h2 class="text-xl font-bold">Select Players</h2>
+              <!-- Player List with Checkboxes -->
+              <template x-for="player in players" :key="player.id">
+                <div class="form-check form-check-inline me-4">
+                  <label class="form-check-label">
+                      <input class="form-check-input"
+                          type="checkbox" 
+                          :value="player.id" 
+                          @change="toggleSelection(player.id)" 
+                          :checked="selectedPlayers.includes(player.id)"
+                      />
+                      <span x-text="player.name"></span>
+                  </label>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <template x-if="selectedPlayers.length == 6">
+            <div x-data="columnPager()" class="p-4">
+            <table class="table table-bordered table-responsive" x-bind:data-page="startIndex">
+              <thead>
+                <tr>
+                  <th colspan="9">6 spelers, 6 op het veld</th>
+                </tr>
+                <tr>
+                  <th></th>
+                  <th colspan="2" class="text-center column-0">1e kwart</th>
+                  <th colspan="2" class="text-center column-1">2e kwart</th>
+                  <th colspan="2" class="text-center column-2">3e kwart</th>
+                  <th colspan="2" class="text-center column-3">4e kwart</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="p-0">
+                    <input type="player1" class="form-control m-0 border-0" x-model="selectedEntry.player1" />
+                  </td>
+                  <td colspan="2" class="text-center table-success column-0">keeper</td>
+                  <td colspan="2" class="text-center column-1">r.voor</td>
+                  <td colspan="2" class="text-center column-2">r.voor</td>
+                  <td colspan="2" class="text-center column-3">r.voor</td>
+                </tr>
+                <tr>
+                  <td class="p-0">
+                    <input type="player2" class="form-control m-0 border-0" x-model="selectedEntry.player2" />
+                  </td>
+                  <td colspan="2" class="text-center column-1">mid</td>
+                  <td colspan="2" class="text-center column-2">mid</td>
+                  <td colspan="2" class="text-center column-3">r.achter</td>
+                  <td colspan="2" class="text-center column-4">l.achter</td>
+                </tr>
+                <tr>
+                  <td class="p-0">
+                    <input type="player3" class="form-control m-0 border-0" x-model="selectedEntry.player3" />
+                  </td>
+                  <td colspan="2" class="text-center column-0">l.voor</td>
+                  <td colspan="2" class="text-center table-success column-1">keeper</td>
+                  <td colspan="2" class="text-center column-2">l.voor</td>
+                  <td colspan="2" class="text-center column-3">l.voor</td>
+                </tr>
+                <tr>
+                  <td class="p-0">
+                    <input type="player4" class="form-control m-0 border-0" x-model="selectedEntry.player4" />
+                  </td>
+                  <td colspan="2" class="text-center column-0">r.achter</td>
+                  <td colspan="2" class="text-center column-1">r.achter</td>
+                  <td colspan="2" class="text-center table-success column-2">keeper</td>
+                  <td colspan="2" class="text-center column-3">r.achter</td>
+                </tr>
+                <tr>
+                  <td class="p-0">
+                    <input type="player5" class="form-control m-0 border-0" x-model="selectedEntry.player5" />
+                  </td>
+                  <td colspan="2" class="text-center column-0">r.voor</td>
+                  <td colspan="2" class="text-center column-1">l.voor</td>
+                  <td colspan="2" class="text-center column-2">mid</td>
+                  <td colspan="2" class="text-center column-3">mid</td>
+                </tr>
+                <tr>
+                  <td class="p-0">
+                    <input type="player6" class="form-control m-0 border-0" x-model="selectedEntry.player6" />
+                  </td>
+                  <td colspan="2" class="text-center column-0">l.achter</td>
+                  <td colspan="2" class="text-center column-1">l.achter</td>
+                  <td colspan="2" class="text-center column-2">l.achter</td>
+                  <td colspan="2" class="text-center table-success column-3">keeper</td>
+                </tr>
+              </tbody>
+              <tfoot class="paging">
+                <tr>
+                  <td> </td>
+                  <td :colspan="8" class="py-2 text-center">
+                    <div class="btn-group" role="group" aria-label="Basic example">
+                      <button type="button" @click="prevPage" :disabled="startIndex === 0" class="px-4 py-1 border bg-gray-200 mr-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-chevron-left" viewBox="0 0 16 16">
+                          <path fill-rule="evenodd" d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0"/>
+                        </svg>
+                      </button>
+                      <button type="button" @click="nextPage" :disabled="startIndex >= 3" class="px-4 py-1 border bg-gray-200">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-chevron-right" viewBox="0 0 16 16">
+                          <path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708"/>
+                        </svg>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+            </div>
+          </template>
+
+          <template x-if="selectedPlayers.length == 7">
+            <div x-data="columnPager()" class="p-4">
+            <table class="table table-bordered table-responsive" x-bind:data-page="startIndex">
+              <thead>
+                <tr>
+                  <th colspan="9">7 spelers, 6 op het veld</th>
+                </tr>
+                <tr>
+                  <th width="40%"></th>
+                  <th colspan="2" width="15%" class="text-cente column-0">1e kwart</th>
+                  <th colspan="2" width="15%" class="text-cente column-1">2e kwart</th>
+                  <th colspan="2" width="15%" class="text-cente column-2">3e kwart</th>
+                  <th colspan="2" width="15%" class="text-cente column-3">4e kwart</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="p-0">
+                    <input type="player1" class="form-control m-0 border-0" x-model="selectedEntry.player1" />
+                  </td>
+                  <td colspan="2" class="text-center table-success column-0">keeper</td>
+                  <td colspan="2" class="text-center column-1">r.achter</td>
+                  <td colspan="2" class="text-center column-2">r.achter</td>
+                  <td class="text-center table-danger column-3">wissel</td>
+                  <td class="text-center">r.achter</td>
+                </tr>
+                <tr>
+                  <td class="p-0">
+                    <input type="player2" class="form-control m-0 border-0" x-model="selectedEntry.player2" />
+                  </td>
+                  <td colspan="2" class="text-center column-0">r.voor</td>
+                  <td class="text-center column-1">r.voor</td>
+                  <td class="text-center table-danger column-1">wissel</td>
+                  <td colspan="2" class="text-center column-2">mid</td>
+                  <td colspan="2" class="text-center column-3">r.voor</td>
+                </tr>
+                <tr>
+                  <td class="p-0">
+                    <input type="player3" class="form-control m-0 border-0" x-model="selectedEntry.player3" />
+                  </td>
+                  <td colspan="2" class="text-center column-0">r.achter</td>
+                  <td colspan="2" class="text-center table-success column-1">keeper</td>
+                  <td colspan="2" class="text-center column-2">l.achter</td>
+                  <td class="text-center column-3">r.achter</td>
+                  <td class="text-center table-danger column-3">wissel</td>
+                </tr>
+                <tr>
+                  <td class="p-0">
+                    <input type="player4" class="form-control m-0 border-0" x-model="selectedEntry.player4" />
+                  </td>
+                  <td colspan="2" class="text-center column-0">mid</td>
+                  <td class="text-center table-danger column-1">wissel</td>
+                  <td class="text-center column-1">r.voor</td>
+                  <td class="text-center column-1">r.voor</td>
+                  <td class="text-center table-danger column-2">wissel</td>
+                  <td colspan="2" class="text-center column-3">mid</td>
+                </tr>
+                <tr>
+                  <td class="p-0">
+                    <input type="player5" class="form-control m-0 border-0" x-model="selectedEntry.player5" />
+                  </td>
+                  <td class="text-center table-danger column-0">wissel</td>
+                  <td class="text-center column-0">l.voor</td>
+                  <td colspan="2" class="text-center column-1">l.voor</td>
+                  <td colspan="2" class="text-center table-success column-2">keeper</td>
+                  <td colspan="2" class="text-center column-3">l.voor</td>
+                </tr>
+                <tr>
+                  <td class="p-0">
+                    <input type="player6" class="form-control m-0 border-0" x-model="selectedEntry.player6" />
+                  </td>
+                  <td colspan="2" class="text-center column-0">l.achter</td>
+                  <td colspan="2" class="text-center column-1">l.achter</td>
+                  <td class="text-center table-danger column-2">wissel</td>
+                  <td class="text-center column-2">r.voor</td>
+                  <td colspan="2" class="text-center column-3">l.achter</td>
+                </tr>
+                <tr>
+                  <td class="p-0">
+                    <input type="player7" class="form-control m-0 border-0" x-model="selectedEntry.player7" />
+                  </td>
+                  <td class="text-center column-0">l.voor</td>
+                  <td class="text-center table-danger column-0">wissel</td>
+                  <td colspan="2" class="text-center column-1">mid</td>
+                  <td colspan="2" class="text-center column-2">l.voor</td>
+                  <td colspan="2" class="text-center table-success column-3">keeper</td>
+                </tr>
+              </tbody>
+              <tfoot class="paging">
+                <tr>
+                  <td> </td>
+                  <td :colspan="8" class="py-2 text-center">
+                    <div class="btn-group" role="group" aria-label="Basic example">
+                      <button type="button" @click="prevPage" :disabled="startIndex === 0" class="px-4 py-1 border bg-gray-200 mr-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-chevron-left" viewBox="0 0 16 16">
+                          <path fill-rule="evenodd" d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0"/>
+                        </svg>
+                      </button>
+                      <button type="button" @click="nextPage" :disabled="startIndex >= 3" class="px-4 py-1 border bg-gray-200">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-chevron-right" viewBox="0 0 16 16">
+                          <path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708"/>
+                        </svg>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+            </div>
+          </template>
+
+          <template x-if="selectedPlayers.length == 8">
+            <div x-data="columnPager()" class="p-4">
+            <table class="table table-bordered table-responsive" x-bind:data-page="startIndex">
+              <thead>
+                <tr>
+                  <th colspan="9">8 spelers, 6 op het veld</th>
+                </tr>
+                <tr>
+                  <th width="40%"></th>
+                  <th colspan="2" width="15%" class="text-center column-0">1e kwart</th>
+                  <th colspan="2" width="15%" class="text-center column-1">2e kwart</th>
+                  <th colspan="2" width="15%" class="text-center column-2">3e kwart</th>
+                  <th colspan="2" width="15%" class="text-center column-3">4e kwart</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="p-0">
+                    <input type="player1" class="form-control m-0 border-0" x-model="selectedEntry.player1" />
+                  </td>
+                  <td colspan="2" class="text-center table-success column-0">keeper</td>
+                  <td colspan="2" class="text-center column-1">r.achter</td>
+                  <td colspan="2" class="text-center column-2">l.achter</td>
+                  <td colspan="2" class="text-center table-danger column-3">wissel</td>
+                </tr>
+                <tr>
+                  <td class="p-0">
+                    <input type="player2" class="form-control m-0 border-0" x-model="selectedEntry.player2" />
+                  </td>
+                  <td colspan="2" class="text-center column-0">l.voor</td>
+                  <td colspan="2" class="text-center table-danger column-1">wissel</td>
+                  <td colspan="2" class="text-center column-2">l.voor</td>
+                  <td colspan="2" class="text-center column-3">l.voor</td>
+                </tr>
+                <tr>
+                  <td class="p-0">
+                    <input type="player3" class="form-control m-0 border-0" x-model="selectedEntry.player3" />
+                  </td>
+                  <td colspan="2" class="text-center column-0">r.achter</td>
+                  <td colspan="2" class="text-center table-success column-1">keeper</td>
+                  <td colspan="2" class="text-center column-2">r.achter</td>
+                  <td colspan="2" class="text-center table-danger column-3">wissel</td>
+                </tr>
+                <tr>
+                  <td class="p-0">
+                    <input type="player4" class="form-control m-0 border-0" x-model="selectedEntry.player4" />
+                  </td>
+                  <td colspan="2" class="text-center column-0">r.voor</td>
+                  <td colspan="2" class="text-center table-danger column-1">wissel</td>
+                  <td colspan="2" class="text-center column-2">r.voor</td>
+                  <td colspan="2" class="text-center column-3">r.voor</td>
+                </tr>
+                <tr>
+                  <td class="p-0">
+                    <input type="player5" class="form-control m-0 border-0" x-model="selectedEntry.player5" />
+                  </td>
+                  <td colspan="2" class="text-center table-danger column-0">wissel</td>
+                  <td colspan="2" class="text-center column-1">l.voor</td>
+                  <td colspan="2" class="text-center table-success column-2">keeper</td>
+                  <td colspan="2" class="text-center column-3">r.achter</td>
+                </tr>
+                <tr>
+                  <td class="p-0">
+                    <input type="player6" class="form-control m-0 border-0" x-model="selectedEntry.player6" />
+                  </td>
+                  <td colspan="2" class="text-center column-0">mid</td>
+                  <td colspan="2" class="text-center column-1">mid</td>
+                  <td colspan="2" class="text-center table-danger column-2">wissel</td>
+                  <td colspan="2" class="text-center column-3">mid</td>
+                </tr>
+                <tr>
+                  <td class="p-0">
+                    <input type="player7" class="form-control m-0 border-0" x-model="selectedEntry.player7" />
+                  </td>
+                  <td colspan="2" class="text-center table-danger column-0">wissel</td>
+                  <td colspan="2" class="text-center column-1">r.voor</td>
+                  <td colspan="2" class="text-center column-2">mid</td>
+                  <td colspan="2" class="text-center table-success column-3">keeper</td>
+                </tr>
+                <tr>
+                  <td class="p-0">
+                    <input type="player8" class="form-control m-0 border-0" x-model="selectedEntry.player8" />
+                  </td>
+                  <td colspan="2" class="text-center column-0">l.achter</td>
+                  <td colspan="2" class="text-center column-1">l.achter</td>
+                  <td colspan="2" class="text-center table-danger column-2">wissel</td>
+                  <td colspan="2" class="text-center column-3">l.achter</td>
+                </tr>
+              </tbody>
+              <tfoot class="paging">
+                <tr>
+                  <td> </td>
+                  <td :colspan="8" class="py-2 text-center">
+                    <div class="btn-group" role="group" aria-label="Basic example">
+                      <button type="button" @click="prevPage" :disabled="startIndex === 0" class="px-4 py-1 border bg-gray-200 mr-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-chevron-left" viewBox="0 0 16 16">
+                          <path fill-rule="evenodd" d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0"/>
+                        </svg>
+                      </button>
+                      <button type="button" @click="nextPage" :disabled="startIndex >= 3" class="px-4 py-1 border bg-gray-200">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-chevron-right" viewBox="0 0 16 16">
+                          <path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708"/>
+                        </svg>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+            </div>
+          </template>
+          
+          <template x-if="selectedPlayers.length == 9">
+            <div x-data="columnPager()" class="p-4">
+            <table class="table table-bordered table-responsive" x-bind:data-page="startIndex">
+              <thead>
+                <tr>
+                  <th colspan="9">9 spelers, 6 op het veld</th>
+                </tr>
+                <tr>
+                  <th></th>
+                  <th colspan="2" class="text-center column-0">1e kwart</th>
+                  <th colspan="2" class="text-center column-1">2e kwart</th>
+                  <th colspan="2" class="text-center column-2">3e kwart</th>
+                  <th colspan="2" class="text-center column-3">4e kwart</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="p-0">
+                    <input type="player1" class="form-control m-0 border-0" x-model="selectedEntry.player1" />
+                  </td>
+                  <td colspan="2" class="text-center table-success column-0">keeper</td>
+                  <td colspan="2" class="text-center column-1">l.achter</td>
+                  <td colspan="2" class="text-center table-danger column-2">wissel</td>
+                  <td colspan="2" class="text-center column-3">l.achter</td>
+                </tr>
+                <tr>
+                  <td class="p-0">
+                    <input type="player2" class="form-control m-0 border-0" x-model="selectedEntry.player2" />
+                  </td>
+                  <td colspan="2" class="text-center column-0">l.achter</td>
+                  <td class="text-center column-1">r.achter</td>
+                  <td class="text-center table-danger column-1">wissel</td>
+                  <td colspan="2" class="text-center column-2">l.achter</td>
+                  <td colspan="2" class="text-center table-danger column-3">wissel</td>
+                </tr>
+                <tr>
+                  <td class="p-0">
+                    <input type="player3" class="form-control m-0 border-0" x-model="selectedEntry.player3" />
+                  </td>
+                  <td colspan="2" class="text-center column-0">mid</td>
+                  <td colspan="2" class="text-center table-success column-1">keeper</td>
+                  <td colspan="2" class="text-center table-danger column-2">wissel</td>
+                  <td colspan="2" class="text-center column-3">mid</td>
+                </tr>
+                <tr>
+                  <td class="p-0">
+                    <input type="player4" class="form-control m-0 border-0" x-model="selectedEntry.player4" />
+                  </td>
+                  <td colspan="2" class="text-center column-0">l.voor</td>
+                  <td colspan="2" class="text-center table-danger column-1">wissel</td>
+                  <td colspan="2" class="text-center column-2">l.voor</td>
+                  <td class="text-center column-3">l.voor</td>
+                  <td class="text-center table-danger column-3">wissel</td>
+                </tr>
+                <tr>
+                  <td class="p-0">
+                    <input type="player5" class="form-control m-0 border-0" x-model="selectedEntry.player5" />
+                  </td>
+                  <td colspan="2" class="text-center table-danger column-0">wissel</td>
+                  <td colspan="2" class="text-center column-1">r.voor</td>
+                  <td class="text-centertable-danger column-2">wissel</td>
+                  <td class="text-center column-2">mid</td>
+                  <td colspan="2" class="text-center table-success column-3">keeper</td>
+                </tr>
+                <tr>
+                  <td class="p-0">
+                    <input type="player6" class="form-control m-0 border-0" x-model="selectedEntry.player6" />
+                  </td>
+                  <td colspan="2" class="text-center table-danger column-0">wissel</td>
+                  <td colspan="2" class="text-center column-1">mid</td>
+                  <td class="text-center column-2">mid</td>
+                  <td class="text-center table-danger column-2">wissel</td>
+                  <td colspan="2" class="text-center column-3">r.achter</td>
+                </tr>
+                <tr>
+                  <td class="p-0">
+                    <input type="player7" class="form-control m-0 border-0" x-model="selectedEntry.player7" />
+                  </td>
+                  <td colspan="2" class="text-center table-danger column-0">wissel</td>
+                  <td colspan="2" class="text-center column-1">l.voor</td>
+                  <td colspan="2" class="text-center table-success column-2">keeper</td>
+                  <td colspan="2" class="text-center column-3">r.voor</td>
+                </tr>
+                <tr>
+                  <td class="p-0">
+                    <input type="player8" class="form-control m-0 border-0" x-model="selectedEntry.player8" />
+                  </td>
+                  <td colspan="2" class="text-center column-0">r.voor</td>
+                  <td colspan="2" class="text-center table-danger column-1">wissel</td>
+                  <td colspan="2" class="text-center column-2">r.voor</td>
+                  <td class="text-center table-danger column-3">wissel</td>
+                  <td class="text-center column-3">l.voor</td>
+                </tr>
+                <tr>
+                  <td class="p-0">
+                    <input type="player9" class="form-control m-0 border-0" x-model="selectedEntry.player9" />
+                  </td>
+                  <td colspan="2" class="text-center column-0">r.achter</td>
+                  <td class="text-center table-danger column-1">wissel</td>
+                  <td class="text-center column-1">r.achter</td>
+                  <td colspan="2" class="text-center column-2">r.achter</td>
+                  <td colspan="2" class="text-center table-danger column-3">wissel</td>
+                </tr>
+              </tbody>
+              <tfoot class="paging">
+                <tr>
+                  <td> </td>
+                  <td colspan="8" class="py-2 text-center">
+                    <div class="btn-group" role="group" aria-label="Basic example">
+                      <button type="button" @click="prevPage" :disabled="startIndex === 0" class="px-4 py-1 border bg-gray-200 mr-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-chevron-left" viewBox="0 0 16 16">
+                          <path fill-rule="evenodd" d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0"/>
+                        </svg>
+                      </button>
+                      <button type="button" @click="nextPage" :disabled="startIndex >= 3" class="px-4 py-1 border bg-gray-200">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-chevron-right" viewBox="0 0 16 16">
+                          <path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708"/>
+                        </svg>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+            </div>
+          </template>
+        </div>
+        <div class="modal-footer d-flex">
+          <p class="flex-grow-1" id="status"></p>
+          <button type="submit" class="btn btn-primary" x-bind:disabled="selectedPlayers.length < 6" x-show="selectedEntry">Opslaan</button>
+          <button type="submit" class="btn btn-primary" x-bind:disabled="selectedPlayers.length < 6" x-show="!selectedEntry">Nieuw maken</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</form>
+
+  </div>
+  <script src="//unpkg.com/alpinejs" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/js/bootstrap.bundle.min.js" integrity="sha384-j1CDi7MgGQ12Z7Qab0qlWQ/Qqz24Gc6BM0thvEMVjHnfYGF0rmFCozFSxQBxwHKO" crossorigin="anonymous"></script>
+  <script>
+    const deploymentId = 'AKfycbxdJo96qQ78ubuFNBouTXAH5IQ46bpuj6-1rbgIKELLgPIKAsc2If59NhactRBFOH4u';
+    const scriptURL = `https://script.google.com/macros/s/${deploymentId}/exec`;
+
+    document
+      .addEventListener('DOMContentLoaded', (e) => {
+        const dateInput = document.getElementById('dateInput');
+        const now = Date.now();
+        dateInput.min = new Date().toISOString().split("T")[0];
+
+      });
+
+    document
+      .getElementById("contact-form")
+      .addEventListener("submit", function(e) {
+        e.preventDefault();
+
+        const userId = getUserId();
+        
+        const form = e.target;
+
+        if (!form.player1) {
+          return;
+        }
+
+        const data = {
+          userId: userId,
+          date: form.date.value,
+          opponent: form.opponent.value,
+          homeOrAway: form.homeOrAway.value,
+          player1: form.player1.value,
+          player2: form.player2.value,
+          player3: form.player3.value,
+          player4: form.player4.value,
+          player5: form.player5.value,
+          player6: form.player6.value,
+          player7: form.player7.value,
+          player8: form.player8.value,
+          player9: form.player9.value,
+          player10: form.player10.value,
+          player11: form.player11.value,
+          player12: form.player12.value,
+          player13: form.player13.value,
+          player14: form.player14.value,
+          player15: form.player15.value,
+          player16: form.player16.value,
+          player17: form.player17.value,
+          player18: form.player18.value,
+          player19: form.player19.value,
+          player20: form.player20.value,
+      };
+
+      fetch(scriptURL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
+      });
+
+      document.getElementById("status").textContent = "Message sent! (Data submitted to Google Sheet)";
+      form.reset();
     });
-  }
 
-  // Dynamically load data as a script (JSONP-style)
-  const script = document.createElement('script');
-  script.src = `https://script.google.com/macros/s/${appId}/exec?callback=callback`;
-  document.body.appendChild(script);
-</script>
+    function columnPager() {
+      return {
+        startIndex: 0,
+        pageSize: 1,
+
+        nextPage() {
+          if (this.startIndex < 3) {
+            this.startIndex += this.pageSize;
+          }
+        },
+
+        prevPage() {
+          if (this.startIndex > 0) {
+            this.startIndex -= this.pageSize;
+          }
+        }
+      };
+    }
+
+    function jsonpFormManager() {
+        return {
+            entries: [],
+            selectedEntry: {},
+            players: [],
+            selectedPlayers: [],
+            loading: true,
+
+            toggleSelection(id) {
+                if (this.selectedPlayers.includes(id)) {
+                    this.selectedPlayers = this.selectedPlayers.filter(x => x !== id);
+                } else {
+                    this.selectedPlayers.push(id);
+                }
+            },
+
+            getPlayerName(id) {
+                const player = this.players.find(p => p.id === id);
+                return player ? player.name : '';
+            },
+
+            loadData() {
+                // Define a unique callback name to avoid conflicts
+                const callbackName = 'jsonpCallback_' + Math.random().toString(36).substr(2, 5);
+
+                // Make callback accessible globally
+                window[callbackName] = (data) => {
+                    this.entries = data;
+                    const players = [...new Set(data
+                      .map(e=> getPlayerValues(e))
+                      .flatMap(x => x)
+                      .filter(x => x))]
+                      .map((e,i) => ({ id: i, name: e }));
+
+                    this.players = players;
+                    this.selectedPlayers = players.map(e => e.id); 
+                    this.loading = false;
+                    // Clean up the global namespace after use
+                    delete window[callbackName];
+                };
+
+                // Create script tag for JSONP
+                const script = document.createElement('script');
+                script.src = `https://script.google.com/macros/s/${deploymentId}/exec?callback=${callbackName}&userId=${getUserId()}`;
+                document.body.appendChild(script);
+            },
+            edit(entry) {
+              this.selectedEntry = entry;
+              console.log(this.selectedEntry);
+            }
+        };
+    }
+
+    function getPlayerValues(obj) {
+      const values = [];
+
+      for (let i = 1; i <= 10; i++) {
+        const key = `player${i}`;
+        if (obj.hasOwnProperty(key)) {
+          values.push(obj[key]);
+        }
+      }
+
+      return values;
+    }
+    function generateUUID() {
+      return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
+        (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
+      );
+    }
+
+    function getUserId() {
+      let userId = localStorage.getItem("userId");
+      if (!userId) {
+        userId = generateUUID();
+        localStorage.setItem("userId", userId);
+      }
+      return userId;
+    }
+
+  </script>
 </body>
 </html>
